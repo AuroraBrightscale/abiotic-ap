@@ -2,9 +2,9 @@
     "$schema": "https://raw.githubusercontent.com/sumneko/vscode-lua/master/setting/schema.json",
     "workspace.maxPreload": 50000,
     "workspace.preloadFileSize": 5000,
-    "workspace.library": ["shared", "scripts", "RE-UE4SS/assets/Mods/shared"],
+    "workspace.library": ["shared", "scripts", "RE-UE4SS/assets/Mods/shared", "lua-apclientpp/api/library"],
     "diagnostics.globals": [],
     "workspace.ignoreDir": [
-        "shared", "RE-UE4SS"
+        "shared", "RE-UE4SS", "lua-apclientpp"
     ]
 }

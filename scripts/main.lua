@@ -3,6 +3,7 @@ local AFUtils = require("AFUtils.AFUtils")
 local AFUtilsDebug = require("AFUtils.AFUtilsDebug")
 local BaseUtils = require("BaseUtils")
 local utils = require("utils")
+local AP = require("lua-apclientpp")
 
 DebugMode = true
 ModName = "abiotic-ap"
@@ -31,38 +32,22 @@ end
 
 --main block
 
-RegisterKeyBind(Key.F2, function()
-    -- ---@type FVector
-    -- local location = {}
-    -- ---@type FRotator
-    -- local rotation = {}
-    -- AFUtils:GetMyPlayer():Local_GetPointAtCrosshair(location, rotation, nil)
-    -- if location then
-    --     local doors = FindAllOf("SimpleDoor_ParentBP_C") ---@cast doors ASimpleDoor_ParentBP_C[]
-    --     ---@type ASimpleDoor_ParentBP_C
-    --     local foundDoor
-    --     ---@type ASimpleDoor_ParentBP_C
-    --     for i, d in pairs(doors) do
-    --         ---@type ASimpleDoor_ParentBP_C
-    --         local door = d
-    --         local position = door:K2_GetActorLocation()
-    --         if math.abs(position.X - location.X) < 200 and
-    --             math.abs(position.Y - location.Y) < 200 and
-    --             math.abs(position.Z - location.Z) < 200 then
-    --             print("Found a door!", i, position)
-    --             foundDoor = door
-    --             foundDoor.DoorState = 3
-    --             break
-    --         end
-    --     end
-    --     if not foundDoor then
-    --         print("Didn't find a door")
-    --     end
-    -- else
-    --     print("No hit")
-    -- end
-    utils.UnlockDoorAtCrosshair()
+-- Hook bootstrap.
+-- TODO Find a way to do this without a delay. Delay is needed for the objects to initialize on game boot
+local worldLoaded = false
+ExecuteWithDelay(500, function()
+    if not worldLoaded then
+        require("hooks")
+        LogInfo("Registered game hooks")
+        worldLoaded = true
+    end
 end)
+
+--Debug keybind to do...stuff.
+RegisterKeyBind(Key.F2, function()
+
+end)
+
 --Print actor debug information for actor within 50cm of crosshair point
 RegisterKeyBind(Key.F5, {}, function()
     ---@type FVector
@@ -111,91 +96,5 @@ RegisterConsoleCommandHandler("ap", function(command, parts, ar)
     return true
 end)
 
-RegisterHook("Function /Game/Blueprints/Widgets/HUD/W_HUD_QuestObjective.W_HUD_QuestObjective_C:UpdateCurrentQuest",
-    ---@param selfParam RemoteUnrealParam<UW_HUD_QuestObjective_C>
-    ---@param newQuestParam RemoteUnrealParam<UScriptStruct>
-    ---@param waypointModeParam RemoteUnrealParam<E_WaypointMode>
-    function(selfParam, newQuestParam, waypointModeParam)
-        local newQuest = newQuestParam:get() ---@cast newQuest UScriptStruct
-        -- local questDt = FindFirstOf("/Game/Blueprints/DataTables/DT_Quests.DT_Quests") ---@cast questDt UDataTable
-        -- if questDt then
-        LogInfo("New quest recieved:")
-        LogInfo(newQuest)
-        newQuest:GetClass():ForEachProperty(
-        ---@param prop Property
-            function(prop)
-                LogInfo(prop:GetFName():ToString())
-            end)
-        LogInfo("End property list")
-        if newQuest then
-            for k, v in pairs(newQuest) do
-                LogInfo(k, v)
-            end
-        end
-        -- else
-        --     LogWarn("Cannot find quest data table")
-        -- end
-    end)
 
-RegisterHook("Function /Game/Blueprints/Doors/SimpleDoor_ParentBP.SimpleDoor_ParentBP_C:TryOpenOrUnlockDoor",
-    ---@param selfParam RemoteUnrealParam<ASimpleDoor_ParentBP_C>
-    ---@param characterToTestParam RemoteUnrealParam<AActor>
-    ---@param doorKickParam RemoteUnrealParam<boolean>
-    ---@param forceDoorParam RemoteUnrealParam<boolean>
-    ---@param forceDoorStateParam RemoteUnrealParam<E_DoorStates>
-    function(selfParam, characterToTestParam, doorKickParam, forceDoorParam, forceDoorStateParam)
-        local door = selfParam:get() ---@cast door ASimpleDoor_ParentBP_C
-        if door.OneWayDoor then
-            LogInfo("Forcing door lock to true for door " .. door:GetFName():ToString())
-            door.OneWayDoor_HasBeenUnlocked = false
-            door.DoorState = 0
-        end
-    end
-)
-
--- Prevent doors from being unlocked unless permitted.
--- RegisterHook("Function /Game/Blueprints/Doors/SimpleDoor_ParentBP.SimpleDoor_ParentBP_C:IsDoorLocked",
---     ---@param selfParam RemoteUnrealParam
---     ---@param toiletLockedParam RemoteUnrealParam
---     ---@param oneWayLockedParam RemoteUnrealParam
---     function(selfParam, toiletLockedParam, oneWayLockedParam)
---         -- print(selfParam)
---         local door = selfParam:get() ---@cast door ASimpleDoor_ParentBP_C
---         -- print(door)
---         --FIXME This is either crashing or not working
---         if door.OneWayDoor then
---             -- LogInfo("Locked", oneWayLockedParam:get())
---             -- if oneWayLockedParam.IsValid then
---             LogInfo("Forcing door lock to true")
---             -- ExecuteInGameThread(function()
---             door.OneWayDoor_HasBeenUnlocked = false
---             -- oneWayLockedParam:set(true)
---             -- end)
---             -- else
---             -- LogInfo("Parameter isn't valid!")
---             -- end
---             -- selfParam:set(nil)
---             -- door = nil
---         end
---     end)
-
----@param door ASimpleDoor_ParentBP_C
-NotifyOnNewObject("SimpleDoor_ParentBP_C", function(door)
-    print("Door created:", door:GetFName():ToString())
-end)
-
---Prevent recipes from being learned unless permitted
-RegisterHook(
-    "/Game/Blueprints/Characters/Abiotic_CharacterProgressionComponent.Abiotic_CharacterProgressionComponent_C:AddPendingRecipesToUnlock",
-    ---@param selfParam RemoteUnrealParam
-    ---@param recipeRowNameParam RemoteUnrealParam
-    function(selfParam, recipeRowNameParam)
-        ---@type FName
-        local name = recipeRowNameParam:get()
-        LogInfo("[AddPendingRecipesToUnlock] Blocked recipe " .. name:ToString())
-        ---@type UAbiotic_CharacterProgressionComponent_C
-        local progressionComponent = selfParam:get()
-        progressionComponent.PendingRecipesToUnlock = {}
-    end
-)
 LogInfo("Mod loading done")
