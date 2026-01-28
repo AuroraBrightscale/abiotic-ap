@@ -3,7 +3,7 @@ local AFUtils = require("AFUtils.AFUtils")
 local AFUtilsDebug = require("AFUtils.AFUtilsDebug")
 local BaseUtils = require("BaseUtils")
 local utils = require("utils")
-local AP = require("lua-apclientpp")
+local apClient = require("ap-client")
 
 DebugMode = true
 ModName = "abiotic-ap"
@@ -92,6 +92,10 @@ RegisterConsoleCommandHandler("ap", function(command, parts, ar)
         else
             AFUtils.DisplayTextChatMessage("Usage: ap learn <recipe>")
         end
+    elseif apCommand:lower() == "connect" then
+        apClient.connect("localhost:38281", "Aurora-AF", nil)
+    elseif apCommand:lower() == "disconnect" then
+        apClient.disconnect()
     end
     return true
 end)
