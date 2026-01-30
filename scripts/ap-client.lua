@@ -1,82 +1,107 @@
--- coroutine example
--- see sample.lua for a more complete example of the API
-
-local AP = require "lua-apclientpp"
-
+local AP = require("lua-apclientpp")
+local utils = require("utils")
 
 -- global to this mod
-local game_name = "Abiotic Factor"
-local items_handling = 7           -- full remote
-local message_format = AP.RenderFormat.TEXT
-local client_version = { 0, 6, 5 } -- optional, defaults to lib version
+local gameName = "Abiotic Factor"
+local itemsHandling = 7           -- full remote
+local messageFormat = AP.RenderFormat.TEXT
+local clientVersion = { 0, 0, 0 } -- optional, defaults to lib version
+---@type APClient | nil
 local ap = nil
+---@type thread | nil
 local co = nil
+---@type boolean
+local isDisconnected = false
 
--- TODO: user input
-local host = "localhost:38281"
-local slot = "Aurora-AF"
-local password = ""
+---@type string
+local slot = nil
+---@type string
+local password = nil
 
 local this = {}
 
 
-local function on_socket_connected()
-    print("Socket connected")
+
+---@param apClient APClient
+---@param data { [string]: any }
+---@param command { [string]: any }
+local function OnPrintJSON(apClient, data, command)
+    local apMessage = apClient:render_json(data, messageFormat)
+    LogInfo("[AP] " .. apMessage)
+    if this.OnAPMessage then
+        this.OnAPMessage(apMessage)
+    end
 end
 
-local function on_socket_error(msg)
-    print("Socket error: " .. msg)
+local function OnSocketConnected()
+    LogInfo("Socket connected")
 end
 
-local function on_socket_disconnected()
-    print("Socket disconnected")
+local function OnSocketError(msg)
+    LogInfo("Socket error: " .. msg)
 end
 
----@param ap APClient
-local function on_room_info(ap)
-    print("Room info")
-    ap:ConnectSlot(slot, password, items_handling, {}, client_version)
+local function OnSocketDisconnected()
+    LogInfo("Socket disconnected")
 end
 
-local function connectLoop(server, slot, password)
-    local running = true -- set this to false to kill the coroutine
-    -- ...
+---@param slotData { [string]: any }
+local function OnSlotConnected(slotData)
+    LogInfo("Slot connected")
+end
 
+---@param dataPackage { [string]: any }
+local function OnDataPackageChanged(dataPackage)
+    LogInfo("Data package changed")
+    utils.DumpTable(dataPackage)
+end
+
+---@param apClient APClient
+local function OnRoomInfo(apClient)
+    LogInfo("Room info")
+    apClient:ConnectSlot(slot, password, itemsHandling, {}, clientVersion)
+end
+
+---@param locationId integer
+function this.SendLocationFound(locationId)
+    if ap then
+        ap:LocationChecks({ locationId })
+    end
+end
+
+---@type function | nil
+this.OnAPMessage = nil
+
+function this.Connect(server, slt, pwd)
+    slot = slt
+    password = pwd
     local uuid = ""
-    ap = AP(uuid, game_name, server);
+    LogInfo("Connecting to", server)
+    ap = AP(uuid, gameName, server);
 
-    ap:set_socket_connected_handler(on_socket_connected)
-    ap:set_socket_error_handler(on_socket_error)
-    ap:set_socket_disconnected_handler(on_socket_disconnected)
-    ap:set_room_info_handler(function() on_room_info(ap) end)
-    -- ...
+    ap:set_print_json_handler(function(data, command) OnPrintJSON(ap, data, command) end)
+    ap:set_socket_connected_handler(OnSocketConnected)
+    ap:set_socket_error_handler(OnSocketError)
+    ap:set_socket_disconnected_handler(OnSocketDisconnected)
+    ap:set_room_info_handler(function() OnRoomInfo(ap) end)
+    ap:set_slot_connected_handler(OnSlotConnected)
+    ap:set_data_package_changed_handler(OnDataPackageChanged)
 
-    while running do
-        ap:poll()
-        coroutine.yield()
-    end
+    --16ms is roughly 60 times per second
+    LoopAsync(16, function()
+        if ap then
+            ap:poll()
+        end
+        return isDisconnected
+    end)
 end
 
-function this.connect(server, slot, password)
-    co = coroutine.create(function() connectLoop(host, slot, password) end)
+function this.Disconnect()
+    -- co = nil
+    isDisconnected = true
+    ap = nil
+    collectgarbage("collect")
+    LogInfo("AP Client disconnected")
 end
-
-function this.disconnect()
-    co = nil
-end
-
-LoopAsync(16, function()
-    if co then
-        coroutine.resume(co);
-    end
-    return false
-end)
 
 return this
-
--- print("Will run for 10 seconds ...")
--- local t0 = os.clock()
--- while os.clock() - t0 < 10 do
---     local status = coroutine.resume(co)
--- end
--- print("shutting down...");

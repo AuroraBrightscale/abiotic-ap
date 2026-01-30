@@ -12,9 +12,7 @@ end
 
 ---Unlocks the simple door that the crosshair is pointing at
 function this.UnlockDoorAtCrosshair()
-    ---@type FVector
     local location = {}
-    ---@type FRotator
     local rotation = {}
     AFUtils:GetMyPlayer():Local_GetPointAtCrosshair(location, rotation, nil)
     if location then

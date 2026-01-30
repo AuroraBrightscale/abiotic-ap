@@ -34,25 +34,24 @@ end
 
 -- Hook bootstrap.
 -- TODO Find a way to do this without a delay. Delay is needed for the objects to initialize on game boot
-local worldLoaded = false
 ExecuteWithDelay(500, function()
-    if not worldLoaded then
-        require("hooks")
-        LogInfo("Registered game hooks")
-        worldLoaded = true
-    end
+    require("hooks")
+    LogInfo("Registered game hooks")
 end)
+
+---@param message string
+apClient.OnAPMessage = function(message)
+    AFUtils.DisplayTextChatMessage(message, "AP")
+end
 
 --Debug keybind to do...stuff.
 RegisterKeyBind(Key.F2, function()
-
+    apClient.Disconnect()
 end)
 
 --Print actor debug information for actor within 50cm of crosshair point
 RegisterKeyBind(Key.F5, {}, function()
-    ---@type FVector
     local location = {}
-    ---@type FRotator
     local rotation = {}
     AFUtils:GetMyPlayer():Local_GetPointAtCrosshair(location, rotation, nil)
     if location then
@@ -93,12 +92,23 @@ RegisterConsoleCommandHandler("ap", function(command, parts, ar)
             AFUtils.DisplayTextChatMessage("Usage: ap learn <recipe>")
         end
     elseif apCommand:lower() == "connect" then
-        apClient.connect("localhost:38281", "Aurora-AF", nil)
+        ExecuteAsync(function() apClient.Connect("archipelago.gg:54292", "Aurora-AF", "") end)
     elseif apCommand:lower() == "disconnect" then
-        apClient.disconnect()
+        apClient.Disconnect()
+    elseif apCommand:lower() == "loc" then
+        local success = false
+        if #parts == 2 then
+            local num = tonumber(parts[2])
+            if num then
+                ExecuteAsync(function() apClient.SendLocationFound(num) end)
+                success = true
+            end
+        end
+        if not success then
+            AFUtils.DisplayTextChatMessage("Usage: ap loc <loc_id>")
+        end
     end
     return true
 end)
-
 
 LogInfo("Mod loading done")

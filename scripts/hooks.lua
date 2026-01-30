@@ -36,7 +36,7 @@ RegisterHook(
     function(selfParam, recipeRowNameParam)
         ---@type FName
         local name = recipeRowNameParam:get()
-        LogInfo("[AddPendingRecipesToUnlock] Blocked recipe " .. name:ToString())
+        LogDebug("[AddPendingRecipesToUnlock] Blocked recipe " .. name:ToString())
         ---@type UAbiotic_CharacterProgressionComponent_C
         local progressionComponent = selfParam:get()
         progressionComponent.PendingRecipesToUnlock = {}
