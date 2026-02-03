@@ -1,115 +1,121 @@
 local AP = require("lua-apclientpp")
 local utils = require("utils")
+local ModVersion = require("mod-version")
 
--- global to this mod
 local gameName = "Abiotic Factor"
-local itemsHandling = 7           -- full remote
+local itemsHandling = 7 -- full remote
 local messageFormat = AP.RenderFormat.TEXT
-local clientVersion = { 0, 0, 0 } -- optional, defaults to lib version
----@type APClient | nil
-local ap = nil
----@type thread | nil
-local co = nil
----@type boolean
-local isDisconnected = false
-
----@type string
-local slot = nil
----@type string
-local password = nil
+--The Archipelago version we're supporting
+local clientVersion = { 0, 6, 6 }
 
 local this = {}
 
+---@class AbioticAPClient
+---@field slot string | nil
+---@field password string | nil
+---@field apclientpp APClient | nil
+---@field isDisconnected boolean
+---@field OnAPMessage function | nil
+local AbioticAPClient = {}
+AbioticAPClient.__index = AbioticAPClient
 
-
----@param apClient APClient
 ---@param data { [string]: any }
----@param command { [string]: any }
-local function OnPrintJSON(apClient, data, command)
-    local apMessage = apClient:render_json(data, messageFormat)
+---@param _ { [string]: any }
+function AbioticAPClient:OnPrintJSON(data, _)
+    local apMessage = self.apclientpp:render_json(data, messageFormat)
     LogInfo("[ChatWindow]", apMessage)
-    if this.OnAPMessage then
-        this.OnAPMessage(apMessage)
+    if self.OnAPMessage then
+        self.OnAPMessage(apMessage)
     end
 end
 
-local function OnSocketConnected()
+function AbioticAPClient:OnSocketConnected()
     LogInfo("Socket connected")
 end
 
-local function OnSocketError(msg)
+function AbioticAPClient:OnSocketError(msg)
     LogInfo("Socket error: " .. msg)
 end
 
-local function OnSocketDisconnected()
+function AbioticAPClient:OnSocketDisconnected()
     LogInfo("Socket disconnected")
 end
 
 ---@param slotData { [string]: any }
-local function OnSlotConnected(slotData)
+function AbioticAPClient:OnSlotConnected(slotData)
     LogInfo("Slot connected")
 end
 
 ---@param dataPackage { [string]: any }
-local function OnDataPackageChanged(dataPackage)
+function AbioticAPClient:OnDataPackageChanged(dataPackage)
     LogInfo("Data package changed. Showing output of dataPackage.games")
     utils.DumpTable(dataPackage.games)
 end
 
-
-local function OnItemsRecieved(items)
+function AbioticAPClient:OnItemsRecieved(items)
     print("Items received:")
     for _, item in ipairs(items) do
         print(item.item)
     end
 end
 
----@param apClient APClient
-local function OnRoomInfo(apClient)
+function AbioticAPClient:OnRoomInfo()
     LogInfo("Room info")
-    apClient:ConnectSlot(slot, password, itemsHandling, {}, clientVersion)
+    self.apclientpp:ConnectSlot(self.slot, self.password, itemsHandling, {}, clientVersion)
 end
 
 ---@param locationId integer
-function this.SendLocationFound(locationId)
-    if ap then
-        ap:LocationChecks({ locationId })
+function AbioticAPClient:SendLocationFound(locationId)
+    if self.apclientpp then
+        self.apclientpp:LocationChecks({ locationId })
     end
 end
 
----@type function | nil
-this.OnAPMessage = nil
+function AbioticAPClient:Disconnect()
+    self.isDisconnected = true
+    self.apclientpp = nil
+    collectgarbage("collect")
+    LogInfo("AP Client disconnected")
+end
 
-function this.Connect(server, slt, pwd)
-    slot = slt
-    password = pwd
-    local uuid = ""
-    LogInfo("Connecting to", server)
-    ap = AP(uuid, gameName, server);
-
-    ap:set_print_json_handler(function(data, command) OnPrintJSON(ap, data, command) end)
-    ap:set_socket_connected_handler(OnSocketConnected)
-    ap:set_socket_error_handler(OnSocketError)
-    ap:set_socket_disconnected_handler(OnSocketDisconnected)
-    ap:set_room_info_handler(function() OnRoomInfo(ap) end)
-    ap:set_slot_connected_handler(OnSlotConnected)
-    ap:set_data_package_changed_handler(OnDataPackageChanged)
-    ap:set_items_received_handler(OnItemsRecieved)
-
+function AbioticAPClient:StartLoop()
     --16ms is roughly 60 times per second
     LoopAsync(16, function()
-        if ap then
-            ap:poll()
+        if self.apclientpp then
+            self.apclientpp:poll()
         end
-        return isDisconnected
+
+        --This will loop forever until self.isDisconnected is true
+        return self.isDisconnected
     end)
 end
 
-function this.Disconnect()
-    isDisconnected = true
-    ap = nil
-    collectgarbage("collect")
-    LogInfo("AP Client disconnected")
+function this.Connect(server, slot, password)
+    ---@class AbioticAPClient
+    local client = setmetatable({}, AbioticAPClient)
+    client.slot = slot
+    client.password = password
+    local uuid = ""
+    LogInfo("Connecting to", server)
+    local apclientpp = AP(uuid, gameName, server);
+    apclientpp:set_print_json_handler(
+        function(data, command) client:OnPrintJSON(data, command) end
+    )
+    apclientpp:set_socket_connected_handler(function() client:OnSocketConnected() end)
+    apclientpp:set_socket_error_handler(function(msg) client:OnSocketError(msg) end)
+    apclientpp:set_socket_disconnected_handler(function() client:OnSocketDisconnected() end)
+    apclientpp:set_room_info_handler(function() client:OnRoomInfo() end)
+    apclientpp:set_slot_connected_handler(function(slotData) client:OnSlotConnected(slotData) end)
+    apclientpp:set_data_package_changed_handler(
+        function(dataPackage) client:OnDataPackageChanged(dataPackage) end
+    )
+    apclientpp:set_items_received_handler(function(items) client:OnItemsRecieved(items) end)
+
+    client:StartLoop()
+
+    client.apclientpp = apclientpp
+
+    return client
 end
 
 return this

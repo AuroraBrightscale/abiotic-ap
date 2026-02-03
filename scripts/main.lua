@@ -1,12 +1,11 @@
 local UEHelpers = require("UEHelpers")
 local AFUtils = require("AFUtils.AFUtils")
-local AFUtilsDebug = require("AFUtils.AFUtilsDebug")
-local utils = require("utils")
-local apClient = require("ap-client")
+local APClient = require("ap-client")
+local _ModVersion = require("mod-version")
 
 DebugMode = true
 ModName = "abiotic-ap"
-ModVersion = "0.0.0"
+ModVersion = _ModVersion
 
 local SERVER_HOST_AND_PORT = "localhost:38281"
 local SLOT_NAME = "Aurora-AF"
@@ -15,6 +14,9 @@ LogInfo("Mod loaded. Rawrrawr.\n")
 
 ---@type FVector
 local lastLocation = nil
+
+---@type AbioticAPClient | nil
+local apClient = nil
 
 ---Dumps the player's current location
 function ReadPlayerLocation()
@@ -41,14 +43,15 @@ ExecuteWithDelay(600, function()
     LogInfo("Registered game hooks")
 end)
 
----@param message string
-apClient.OnAPMessage = function(message)
-    AFUtils.DisplayTextChatMessage(message, "[AP]")
-end
+
 
 --Debug keybind to do...stuff.
 RegisterKeyBind(Key.F2, function()
-    ExecuteAsync(apClient.Disconnect)
+    ExecuteAsync(function()
+        if apClient then
+            apClient:Disconnect()
+        end
+    end)
 end)
 
 --Print actor debug information for actor within 50cm of crosshair point
@@ -94,16 +97,26 @@ RegisterConsoleCommandHandler("ap", function(command, parts, ar)
             AFUtils.DisplayTextChatMessage("Usage: ap learn <recipe>")
         end
     elseif apCommand:lower() == "connect" then
-        ExecuteAsync(function() apClient.Connect(SERVER_HOST_AND_PORT, SLOT_NAME, "") end)
+        ExecuteAsync(function()
+            apClient = APClient.Connect(SERVER_HOST_AND_PORT, SLOT_NAME, "")
+            ---@param message string
+            apClient.OnAPMessage = function(message)
+                AFUtils.DisplayTextChatMessage(message, "[AP]")
+            end
+        end)
     elseif apCommand:lower() == "disconnect" then
-        ExecuteAsync(apClient.Disconnect)
+        ExecuteAsync(function() if apClient then apClient:Disconnect() end end)
         AFUtils.DisplayTextChatMessage("Disconnected", "[AP]")
     elseif apCommand:lower() == "loc" then
         local success = false
         if #parts == 2 then
             local num = tonumber(parts[2])
             if num then
-                ExecuteAsync(function() apClient.SendLocationFound(num) end)
+                ExecuteAsync(function()
+                    if apClient then
+                        apClient:SendLocationFound(num)
+                    end
+                end)
                 success = true
             end
         end

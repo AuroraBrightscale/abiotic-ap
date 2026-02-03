@@ -18,6 +18,22 @@ function this.DumpTable(tbl, prefix)
     end
 end
 
+---Splits a string with a single character delimiter.
+---From https://stackoverflow.com/questions/1426954/split-string-in-lua
+---@param inputstr string
+---@param sep string | nil
+---@return string[]
+function this.SplitString(inputstr, sep)
+    if sep == nil then
+        sep = "%s"
+    end
+    local t = {}
+    for str in string.gmatch(inputstr, "([^" .. sep .. "]+)") do
+        table.insert(t, str)
+    end
+    return t
+end
+
 ---Unlocks the simple door that the crosshair is pointing at
 function this.UnlockDoorAtCrosshair()
     local location = {}
