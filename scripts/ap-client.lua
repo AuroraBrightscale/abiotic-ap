@@ -27,7 +27,7 @@ local this = {}
 ---@param command { [string]: any }
 local function OnPrintJSON(apClient, data, command)
     local apMessage = apClient:render_json(data, messageFormat)
-    LogInfo("[AP] " .. apMessage)
+    LogInfo("[ChatWindow]", apMessage)
     if this.OnAPMessage then
         this.OnAPMessage(apMessage)
     end
@@ -52,8 +52,16 @@ end
 
 ---@param dataPackage { [string]: any }
 local function OnDataPackageChanged(dataPackage)
-    LogInfo("Data package changed")
-    utils.DumpTable(dataPackage)
+    LogInfo("Data package changed. Showing output of dataPackage.games")
+    utils.DumpTable(dataPackage.games)
+end
+
+
+local function OnItemsRecieved(items)
+    print("Items received:")
+    for _, item in ipairs(items) do
+        print(item.item)
+    end
 end
 
 ---@param apClient APClient
@@ -86,6 +94,7 @@ function this.Connect(server, slt, pwd)
     ap:set_room_info_handler(function() OnRoomInfo(ap) end)
     ap:set_slot_connected_handler(OnSlotConnected)
     ap:set_data_package_changed_handler(OnDataPackageChanged)
+    ap:set_items_received_handler(OnItemsRecieved)
 
     --16ms is roughly 60 times per second
     LoopAsync(16, function()
@@ -97,7 +106,6 @@ function this.Connect(server, slt, pwd)
 end
 
 function this.Disconnect()
-    -- co = nil
     isDisconnected = true
     ap = nil
     collectgarbage("collect")

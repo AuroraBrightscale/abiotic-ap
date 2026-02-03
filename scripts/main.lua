@@ -1,13 +1,15 @@
 local UEHelpers = require("UEHelpers")
 local AFUtils = require("AFUtils.AFUtils")
 local AFUtilsDebug = require("AFUtils.AFUtilsDebug")
-local BaseUtils = require("BaseUtils")
 local utils = require("utils")
 local apClient = require("ap-client")
 
 DebugMode = true
 ModName = "abiotic-ap"
 ModVersion = "0.0.0"
+
+local SERVER_HOST_AND_PORT = "localhost:38281"
+local SLOT_NAME = "Aurora-AF"
 
 LogInfo("Mod loaded. Rawrrawr.\n")
 
@@ -34,19 +36,19 @@ end
 
 -- Hook bootstrap.
 -- TODO Find a way to do this without a delay. Delay is needed for the objects to initialize on game boot
-ExecuteWithDelay(500, function()
+ExecuteWithDelay(600, function()
     require("hooks")
     LogInfo("Registered game hooks")
 end)
 
 ---@param message string
 apClient.OnAPMessage = function(message)
-    AFUtils.DisplayTextChatMessage(message, "AP")
+    AFUtils.DisplayTextChatMessage(message, "[AP]")
 end
 
 --Debug keybind to do...stuff.
 RegisterKeyBind(Key.F2, function()
-    apClient.Disconnect()
+    ExecuteAsync(apClient.Disconnect)
 end)
 
 --Print actor debug information for actor within 50cm of crosshair point
@@ -92,9 +94,10 @@ RegisterConsoleCommandHandler("ap", function(command, parts, ar)
             AFUtils.DisplayTextChatMessage("Usage: ap learn <recipe>")
         end
     elseif apCommand:lower() == "connect" then
-        ExecuteAsync(function() apClient.Connect("archipelago.gg:54292", "Aurora-AF", "") end)
+        ExecuteAsync(function() apClient.Connect(SERVER_HOST_AND_PORT, SLOT_NAME, "") end)
     elseif apCommand:lower() == "disconnect" then
-        apClient.Disconnect()
+        ExecuteAsync(apClient.Disconnect)
+        AFUtils.DisplayTextChatMessage("Disconnected", "[AP]")
     elseif apCommand:lower() == "loc" then
         local success = false
         if #parts == 2 then

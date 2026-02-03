@@ -4,9 +4,17 @@ local AFUtils = require("AFUtils.AFUtils")
 
 ---Dumps the table values of the given table
 ---@param tbl table The table to dump
-function this.DumpTable(tbl)
+function this.DumpTable(tbl, prefix)
     for k, v in pairs(tbl) do
-        print(k, v)
+        if type(v) == "table" then
+            this.DumpTable(v, k .. ".")
+        else
+            if prefix then
+                print(prefix .. k, v)
+            else
+                print(k, v)
+            end
+        end
     end
 end
 
