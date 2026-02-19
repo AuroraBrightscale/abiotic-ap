@@ -34,12 +34,19 @@ function ReadPlayerLocation()
     lastLocation = Location
 end
 
+function OnQuitGame()
+    if apClient and not apClient.isDisconnected then
+        apClient:Disconnect()
+    end
+end
+
 --main block
 
 -- Hook bootstrap.
 -- TODO Find a way to do this without a delay. Delay is needed for the objects to initialize on game boot
 ExecuteWithDelay(600, function()
-    require("hooks")
+    local hooks = require("hooks")
+    hooks.OnQuitGame = OnQuitGame
     LogInfo("Registered game hooks")
 end)
 
@@ -48,8 +55,26 @@ end)
 --Debug keybind to do...stuff.
 RegisterKeyBind(Key.F2, function()
     ExecuteAsync(function()
-        if apClient then
-            apClient:Disconnect()
+        local obj = StaticFindObject(
+            "/Engine/Transient.AbioticGameEngine_2147482617:Abiotic_GameInstance_C_2147482525.W_PlayerHUD_Main_C_2147447866.WidgetTree_2147447865.W_EscapeMenu_Main.WidgetTree_2147447462.W_MainMenuButton_LeaveGame"
+        )
+        if obj then
+            -- ---@cast obj UW_MainMenuButton_C
+            -- local prop = obj.ButtonPressed
+            -- ---@cast obj MulticastDelegateProperty
+            -- -- Get all current bindings
+            -- local bindings = prop:GetBindings()
+            -- if bindings then
+            --     print("Delegate has", #bindings, "bindings")
+            --     for i, binding in ipairs(bindings) do
+            --         print(string.format("[%d] %s::%s",
+            --             i,
+            --             binding.Object:GetFullName(),
+            --             binding.FunctionName:ToString()))
+            --     end
+            -- end
+        else
+            LogInfo("Not found")
         end
     end)
 end)

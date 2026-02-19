@@ -18,6 +18,21 @@ function this.DumpTable(tbl, prefix)
     end
 end
 
+---Searches the given array for the given value. Returns `true` if found.
+---@generic T
+---@param array T[]
+---@param value T
+---@return boolean
+function this.ArrayContains(array, value)
+    for _, val in ipairs(array) do
+        if val == value then
+            return true
+        end
+    end
+
+    return false
+end
+
 ---Splits a string with a single character delimiter.
 ---From https://stackoverflow.com/questions/1426954/split-string-in-lua
 ---@param inputstr string
