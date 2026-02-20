@@ -1,6 +1,6 @@
 local utils = require("utils")
 local afUtils = require("AFUtils.AFUtils")
-local apClient = require("ap-client")
+local locations = require("locations")
 
 ---@type [string, integer, integer][]
 local hooks = {}
@@ -10,6 +10,10 @@ local this = {}
 ---Called when the player quits the game.
 ---@type fun() | nil
 this.OnQuitGame = nil
+
+---Called when a check should be sent.
+---@type fun(id: integer) | nil
+this.OnLocationCheck = nil
 
 --- Registers a hook using the same UE4SS RegisterHook signature, but collects the hook's IDs to
 --- unregister when the player quits the game.
@@ -89,7 +93,6 @@ SafeRegisterHook(
     )
         ---Seed initialization: Open the cafeteria section and set the first quest to report to
         ---the security officer
-        LogInfo("World save data applied", levelParam:get():ToString())
         if levelParam:get():ToString() == "Facility_Office1" then
             --Destroy the cafeteria door
             local damagetype = FindFirstOf("/Game/Blueprints/DamageTypes/DamageType_Blunt")
@@ -101,9 +104,9 @@ SafeRegisterHook(
                     1000,
                     damagetype
                 )
-                LogInfo("Cafeteria door to lobby opened")
+                LogDebug("Cafeteria door to lobby opened")
             else
-                LogInfo("Could not find cafeteria door to lobby")
+                LogDebug("Could not find cafeteria door to lobby")
             end
 
             --Open the midway cafeteria doors
@@ -114,9 +117,9 @@ SafeRegisterHook(
                 ---@cast door ASimpleDoor_ParentBP_C
                 if door and door:IsValid() then
                     door:UnlockViaButton(true)
-                    LogInfo("Opened cafeteria midway door " .. i)
+                    LogDebug("Opened cafeteria midway door " .. i)
                 else
-                    LogInfo("Could not find cafeteria midway door " .. i)
+                    LogDebug("Could not find cafeteria midway door " .. i)
                 end
             end
 
@@ -140,14 +143,14 @@ SafeRegisterHook(
     ---@param selfParam RemoteUnrealParam
     ---@param correctParam RemoteUnrealParam
     function(selfParam, correctParam)
-        ---@type UW_Research_RecipeGuesser_C
-        local _self = selfParam:get()
-        ---@type boolean
-        local correct = correctParam:get()
+        local _self = selfParam:get() ---@type UW_Research_RecipeGuesser_C
+        local correct = correctParam:get() ---@type boolean
         local itemName = _self.CurrentRecipe:ToString()
+        local checkSearch = utils.Search(locations.research, "ref", itemName)
+        local checkData = utils.FirstOrNil(checkSearch)
 
-        if correct and utils.ArrayContains(checkRecipes, itemName) then
-            LogDebug("Blocking AP restricted research: ", itemName)
+        if correct and checkData then
+            LogDebug("Blocking AP restricted research: ", checkData.ref)
             correctParam:set(false)
             for _, slot in ipairs({
                 _self.ReceivingSlot0,
@@ -158,7 +161,9 @@ SafeRegisterHook(
                 slot:ResetSlotToEmpty()
                 slot.CorrectTrim:SetVisibility(2) --ESlateVisibility.Hidden
             end
-            --TODO send the check
+            if this.OnLocationCheck then
+                this.OnLocationCheck(checkData.id)
+            end
             afUtils.DisplayWarningMessage(
                 "You can't learn this yet. But someone else may have found something...",
                 AFUtils.CriticalityLevels.Yellow

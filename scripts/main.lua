@@ -2,13 +2,11 @@ local UEHelpers = require("UEHelpers")
 local AFUtils = require("AFUtils.AFUtils")
 local APClient = require("ap-client")
 local _ModVersion = require("mod-version")
+local utils = require("utils")
 
 DebugMode = true
 ModName = "abiotic-ap"
 ModVersion = _ModVersion
-
-local SERVER_HOST_AND_PORT = "localhost:38281"
-local SLOT_NAME = "Aurora-AF"
 
 LogInfo("Mod loaded. Rawrrawr.\n")
 
@@ -36,7 +34,18 @@ end
 
 function OnQuitGame()
     if apClient and not apClient.isDisconnected then
-        apClient:Disconnect()
+        ExecuteAsync(function() if apClient then apClient:Disconnect() end end)
+    else
+        collectgarbage("collect")
+    end
+end
+
+---@param id integer
+function OnLocationCheck(id)
+    if apClient then
+        ExecuteAsync(function()
+            apClient:SendLocationFound(id)
+        end)
     end
 end
 
@@ -47,6 +56,7 @@ end
 ExecuteWithDelay(600, function()
     local hooks = require("hooks")
     hooks.OnQuitGame = OnQuitGame
+    hooks.OnLocationCheck = OnLocationCheck
     LogInfo("Registered game hooks")
 end)
 
@@ -56,23 +66,20 @@ end)
 RegisterKeyBind(Key.F2, function()
     ExecuteAsync(function()
         local obj = StaticFindObject(
-            "/Engine/Transient.AbioticGameEngine_2147482617:Abiotic_GameInstance_C_2147482525.W_PlayerHUD_Main_C_2147447866.WidgetTree_2147447865.W_EscapeMenu_Main.WidgetTree_2147447462.W_MainMenuButton_LeaveGame"
+            "/Game/Blueprints/DataTables/DT_Recipes.DT_Recipes"
         )
-        if obj then
-            -- ---@cast obj UW_MainMenuButton_C
-            -- local prop = obj.ButtonPressed
-            -- ---@cast obj MulticastDelegateProperty
-            -- -- Get all current bindings
-            -- local bindings = prop:GetBindings()
-            -- if bindings then
-            --     print("Delegate has", #bindings, "bindings")
-            --     for i, binding in ipairs(bindings) do
-            --         print(string.format("[%d] %s::%s",
-            --             i,
-            --             binding.Object:GetFullName(),
-            --             binding.FunctionName:ToString()))
-            --     end
-            -- end
+        if obj ~= nil then
+            ---@cast obj UDataTable
+            obj:ForEachRow(function(name, data)
+                LogDebug(name)
+                -- utils.DumpTable(data)
+                -- if data ~= nil then
+                --     data:ForEachProperty(function(prop)
+                --         LogDebug("\t" ..
+                --             prop:GetFName():ToString() .. " : " .. obj:GetPropertyValue(prop:GetFName():ToString()))
+                --     end)
+                -- end
+            end)
         else
             LogInfo("Not found")
         end
@@ -123,7 +130,21 @@ RegisterConsoleCommandHandler("ap", function(command, parts, ar)
         end
     elseif apCommand:lower() == "connect" then
         ExecuteAsync(function()
-            apClient = APClient.Connect(SERVER_HOST_AND_PORT, SLOT_NAME, "")
+            --Defaults
+            local hostAndPort = "localhost:38281" -- default AP localhost port
+            local slotName    = "Player1"         -- default name in AP yamls
+            local password    = ""                -- Rooms by default don't have a password
+            if #parts >= 2 then
+                hostAndPort = parts[2]
+            end
+            if #parts >= 3 then
+                slotName = parts[3]
+            end
+            if #parts == 4 then
+                password = parts[4]
+            end
+            AFUtils.DisplayTextChatMessage("Connecting to " .. hostAndPort .. ", slot name " .. slotName, "[AP]")
+            apClient = APClient.Connect(hostAndPort, slotName, password)
             ---@param message string
             apClient.OnAPMessage = function(message)
                 AFUtils.DisplayTextChatMessage(message, "[AP]")

@@ -33,6 +33,36 @@ function this.ArrayContains(array, value)
     return false
 end
 
+---Searches the given array of objects, returning any where the given key
+---matches the given value.
+---Optionally give a key for a table property to check.
+---@generic T : table
+---@param array T[]
+---@key string
+---@param value unknown
+---@return T[]
+function this.Search(array, key, value)
+    local out = {} ---@type table[]
+    for _, val in ipairs(array) do
+        if val[key] == value then
+            table.insert(out, val)
+        end
+    end
+    return out
+end
+
+---Returns the first item of the array, or `nil` if the array is empty.
+---@generic T : table
+---@param array T[]
+---@return T | nil
+function this.FirstOrNil(array)
+    if #array > 0 then
+        return array[1]
+    else
+        return nil
+    end
+end
+
 ---Splits a string with a single character delimiter.
 ---From https://stackoverflow.com/questions/1426954/split-string-in-lua
 ---@param inputstr string
